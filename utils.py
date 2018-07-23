@@ -50,9 +50,13 @@ def generate_periods_features(df):
 
     Returns (pandas.DaraFrame): featurized input with the original columns dropped
     """
-    assert 'item_id' in df
-    for col in ['activation_date', 'date_from', 'date_to']:
+    for col in ['item_id', 'activation_date', 'date_from', 'date_to']:
         assert col in df
+    null_idx = df['activation_date'].isnull()
+    # checked train and test and date_from, date_to don't have nulls
+    assert df.isnull().sum().sum() == 0
+    df['activation_date'][null_idx] = df['date_from'][null_idx]
+    for col in ['activation_date', 'date_from', 'date_to']:
         df[col] = df[col].apply(pd.to_datetime, yearfirst=True)
     assert len(df) == len(df.drop_duplicates('item_id'))
     assert (df['date_to'] > df['date_from']).all()
