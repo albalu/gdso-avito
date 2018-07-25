@@ -1,0 +1,4 @@
+numpy
+pandas
+matplotlib
+sqlite3 # should be already included in python installation
