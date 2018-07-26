@@ -44,7 +44,7 @@ def is_russian_2017_holiday(date):
     return int(date in russian_2017_holidays)
 
 
-def featurize_date_col(df, col, remove_when_done=True):
+def featurize_date_col(df, col, remove_when_done=False):
     """
     Returns some information (features) about the column date, added to the
     base dataframe.
@@ -64,7 +64,7 @@ def featurize_date_col(df, col, remove_when_done=True):
     return df
 
 
-def generate_periods_features(df, remove_col_when_done=True):
+def generate_periods_features(df, remove_col_when_done=False):
     """
     Given a dataframe with features item_id, activation_date, date_from, date_to,
     it generates features that help the training the machine learning (ML) model.
@@ -93,7 +93,23 @@ def generate_periods_features(df, remove_col_when_done=True):
     df['days_online'] = (df['date_to'] - df['date_from']).dt.days
     for col in ['activation_date', 'date_from', 'date_to']:
         df = featurize_date_col(df, col, remove_when_done=remove_col_when_done)
-    return df
+
+    # now we make the final dataframe which is featurized for unique item_id
+    grouped = df.groupby('item_id')
+    base = grouped[['item_id']].count().rename(columns={'item_id': 'nlisted'})
+    base['sum_days_online'] = grouped[['days_online']].sum()
+    base['mean_days_online'] = grouped[['days_online']].mean()
+    base['last_days_online'] = grouped[['days_online']].last()
+    base['sum_days_to_publishe'] = grouped[['days_to_publish']].sum()
+    base['mean_days_to_publish'] = grouped[['days_to_publish']].mean()
+    base['median_date_to_isholiday'] = grouped[['date_to_isholiday']].median()
+    base['median_date_to_wday'] = grouped[['date_to_wday']].median()
+    base['median_date_to_yday'] = grouped[['date_to_yday']].median()
+    base['start_date'] = grouped[['date_from']].min()
+    base['end_date'] = grouped[['date_to']].max()
+    for col in ['start_date', 'end_date']:
+        base = featurize_date_col(base, col, remove_when_done=True)
+    return base.reset_index()
 
 
 def TpotAutoml(mode, feature_names=None, **kwargs):
