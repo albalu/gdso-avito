@@ -10,7 +10,6 @@ if __name__ == "__main__":
         name='gdso-avito',
         version='0.1.0',
         description='Avito Kaggle GDSO data science workshop',
-        long_description=open(os.path.join(module_dir, 'README.rst')).read(),
         url='https://github.com/albalu/gdso-avito',
         author='Alireza Faghaninia, Zexuan Xu, Winnie Lee, Darius Parvin',
         author_email='alireza.faghaninia@gmail.com',
