@@ -1,8 +1,8 @@
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from tpot import TPOTClassifier, TPOTRegressor
+from sklearn.model_selection import TimeSeriesSplit
 pd.options.mode.chained_assignment = None
 
 russian_2017_holidays = pd.to_datetime([
@@ -270,23 +270,31 @@ if __name__ == '__main__':
     # inputs
     target = 'deal_probability'
     RS = 23
-    LIMIT = 1000
-    TIMEOUT_MINS = 2
-    SCORING = 'r2' # could be set to neg_mean_squared_error and then take np.sqrt(abs()) of that to compare with the leaderboard
+    LIMIT = 100000
+    TIMEOUT_MINS = 3
+    SCORING = 'neg_mean_squared_error' # could be set to neg_mean_squared_error and then take np.sqrt(abs()) of that to compare with the leaderboard
 
     # training
     train = pd.read_csv('data/train.csv')[:LIMIT].dropna()
     train = pd.get_dummies(train[['price', 'category_name', 'user_type', target]])
-    print(train)
-    X_train, X_test, y_train, y_test = \
-        train_test_split(train.drop(target, axis=1).values, train[target],
-                         train_size=0.75, test_size=0.25, random_state=RS)
+    print('mean of the deal_probability in the selected subset')
+    print(train[target].mean())
+    tss = TimeSeriesSplit(n_splits=4)
+    X = (train.drop(target, axis=1)).values
+    y = train[target].values
+    # tss.split(X) is a generator object used for cross-validation
+    train_index, test_index = list(tss.split(X))[-1]
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+
     tpot = TpotAutoml(mode='regression',
                       max_time_mins=TIMEOUT_MINS,
                       scoring=SCORING,
                       random_state=RS,
                       n_jobs=-1,
-                      verbosity=2)
+                      verbosity=2,
+                      cv=TimeSeriesSplit(n_splits=3))
+
     tpot.fit(X_train, y_train)
     top_scores = tpot.get_top_models(return_scores=True)
     print('\ntop cv scores:')
