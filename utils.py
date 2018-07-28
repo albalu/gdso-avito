@@ -5,6 +5,19 @@ from tpot import TPOTClassifier, TPOTRegressor
 from sklearn.model_selection import TimeSeriesSplit
 pd.options.mode.chained_assignment = None
 
+import pandas as pd
+import gc
+import matplotlib.pyplot as plt
+from matplotlib_venn import venn2, venn2_circles # requires pip install matplotlib_venn
+import string
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+import nltk
+from nltk.corpus import stopwords
+import scipy
+
 russian_2017_holidays = pd.to_datetime([
     '2017-01-01', # new years day
     '2017-01-02',  # Bank Holiday
@@ -62,54 +75,6 @@ def featurize_date_col(df, col, remove_when_done=False):
     if remove_when_done:
         df = df.drop(col, axis=1)
     return df
-
-
-def generate_periods_features(df, remove_col_when_done=False):
-    """
-    Given a dataframe with features item_id, activation_date, date_from, date_to,
-    it generates features that help the training the machine learning (ML) model.
-    It then drops the original columns that are not directly usable by ML models.
-
-    Args:
-        df (pandas.DataFrame): must include 'item_id', 'activation_date',
-            'date_from', 'date_to' columns.
-        remove_col_when_done (bool): when featurizing the date columns, whether
-            to remove them afterwards or not.
-
-    Returns (pandas.DaraFrame): featurized input with the original columns dropped
-    """
-    for col in ['item_id', 'activation_date', 'date_from', 'date_to']:
-        assert col in df
-    null_idx = df['activation_date'].isnull()
-    df['activation_date'].loc[null_idx] = df['date_from'].loc[null_idx]
-    assert df.isnull().sum().sum() == 0
-    for col in ['activation_date', 'date_from', 'date_to']:
-        df[col] = pd.to_datetime(df[col], format='%Y-%m-%d')
-    assert (df['date_to'] >= df['date_from']).all()
-    assert (df['date_from'] >= df['activation_date']).all()
-
-    # feature generation
-    df['days_to_publish'] = (df['date_from']-df['activation_date']).dt.days
-    df['days_online'] = (df['date_to'] - df['date_from']).dt.days
-    for col in ['activation_date', 'date_from', 'date_to']:
-        df = featurize_date_col(df, col, remove_when_done=remove_col_when_done)
-
-    # now we make the final dataframe which is featurized for unique item_id
-    grouped = df.groupby('item_id')
-    base = grouped[['item_id']].count().rename(columns={'item_id': 'nlisted'})
-    base['sum_days_online'] = grouped[['days_online']].sum()
-    base['mean_days_online'] = grouped[['days_online']].mean()
-    base['last_days_online'] = grouped[['days_online']].last()
-    base['sum_days_to_publishe'] = grouped[['days_to_publish']].sum()
-    base['mean_days_to_publish'] = grouped[['days_to_publish']].mean()
-    base['median_date_to_isholiday'] = grouped[['date_to_isholiday']].median()
-    base['median_date_to_wday'] = grouped[['date_to_wday']].median()
-    base['median_date_to_yday'] = grouped[['date_to_yday']].median()
-    base['start_date'] = grouped[['date_from']].min()
-    base['end_date'] = grouped[['date_to']].max()
-    for col in ['start_date', 'end_date']:
-        base = featurize_date_col(base, col, remove_when_done=True)
-    return base.reset_index()
 
 
 def TpotAutoml(mode, feature_names=None, **kwargs):
@@ -265,6 +230,65 @@ def is_greater_better(scoring_function):
     else:
         raise ValueError('Unsupported scoring_function: "{}"'.format(
             scoring_function))
+
+
+def get_aggregate_periods(all_periods, all_samples, write_to_csv=True):
+    """
+    Returns all_samples (tran and test dfs) with features related to users
+    overall listings (aggregate periods features) to be merged with train data.
+
+    Args:
+        all_periods (pandas.DataFrame): must have "item_id", "activation_date",
+            "date_from" and "date_to". dates must be datetime type
+        all_samples (pandas.DataFrame): must have "item_id" and "user_id"
+        write_to_csv (bool): whether to write featurized data to csv at the end
+
+    Returns (pandas.DataFrame):
+    """
+    null_idx = all_periods['activation_date'].isna()
+    all_periods['activation_date'][null_idx] = all_periods['date_from'][null_idx]
+    assert (all_periods['date_to'] >= all_periods['date_from']).all()
+    # we can do this below since they're all in 2017 and this way is faster
+    all_periods['days_to_publish'] = all_periods['date_from'].dt.dayofyear - \
+                                     all_periods['activation_date'].dt.dayofyear
+    all_periods['days_online'] = all_periods['date_to'].dt.dayofyear - \
+                                 all_periods['date_from'].dt.dayofyear
+    for col in ['activation_date', 'date_from', 'date_to']:
+        all_periods = featurize_date_col(all_periods, col)
+
+    grouped = all_periods.groupby('item_id')
+    base = grouped[['item_id']].count().rename(columns={'item_id': 'nlisted'})
+    base['sum_days_online'] = grouped[['days_online']].sum()
+    base['mean_days_online'] = grouped[['days_online']].mean()
+    base['last_days_online'] = grouped[['days_online']].last()
+    base['sum_days_to_publish'] = grouped[['days_to_publish']].sum()
+    base['mean_days_to_publish'] = grouped[['days_to_publish']].mean()
+    base['median_date_to_isholiday'] = grouped[['date_to_isholiday']].median()
+    base['median_date_to_wday'] = grouped[['date_to_wday']].median()
+    base['median_date_to_yday'] = grouped[['date_to_yday']].median()
+
+    base['start_date'] = grouped[['date_from']].min()
+    base['end_date'] = grouped[['date_to']].max()
+    for col in ['start_date', 'end_date']:
+        base = featurize_date_col(base, col, remove_when_done=True)
+    if 'item_id' not in all_periods:
+        all_periods = all_periods.reset_index()
+    if 'item_id' not in base:
+        base = base.reset_index()
+    all_periods = all_periods.drop_duplicates(['item_id'])
+    all_periods = all_periods.merge(base, on='item_id', how='left')
+    all_periods = all_periods.merge(all_samples, on='item_id', how='left')
+    avg_per_user_periods = all_periods.drop(
+        ['item_id', 'activation_date', 'date_from', 'date_to'], axis=1
+                                            ).groupby('user_id').mean()
+    avg_per_user_periods['nitems'] = all_periods[
+        ['user_id', 'item_id']].groupby('user_id').count()
+    if write_to_csv:
+        avg_per_user_periods.to_csv('data/periods_aggregate_features.csv')
+    return avg_per_user_periods
+
+
+
 
 if __name__ == '__main__':
     # inputs
