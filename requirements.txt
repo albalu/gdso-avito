@@ -1,7 +1,9 @@
 numpy
+scipy
 pandas
 matplotlib
 tpot
 xgboost
 spacy
 matplotlib_venn
+nltk

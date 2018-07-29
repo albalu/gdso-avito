@@ -282,7 +282,7 @@ def get_aggregate_periods(all_periods, all_samples, write_to_csv=True):
         ['item_id', 'activation_date', 'date_from', 'date_to'], axis=1
                                             ).groupby('user_id').mean()
     avg_per_user_periods['nitems'] = all_periods[
-        ['user_id', 'item_id']].groupby('user_id').count()
+        ['user_id', 'item_id']].groupby('user_id').count().reset_index()['item_id']
     if write_to_csv:
         avg_per_user_periods.to_csv('data/periods_aggregate_features.csv')
     return avg_per_user_periods
