@@ -1,3 +1,4 @@
+import warnings
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
@@ -203,8 +204,6 @@ def _tpot_class_wrapper(tpot_class, **kwargs):
 
 def is_greater_better(scoring_function):
     """
-    WARNING UNPUBLISHED WORK! Please don't distribute
-
     Determines whether scoring_function being greater is more favorable/better.
 
     Args:
@@ -228,8 +227,9 @@ def is_greater_better(scoring_function):
                               'mean_squared_error']:
         return False
     else:
-        raise ValueError('Unsupported scoring_function: "{}"'.format(
-            scoring_function))
+        warnings.warn('The scoring_function: "{}" not found; continuing assuming'
+                      ' greater score is better'.format(scoring_function))
+        return True
 
 
 def get_aggregate_periods(all_periods, all_samples, write_to_csv=True):
