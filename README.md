@@ -10,5 +10,3 @@ that we do during the data science workshop held by graduate data science organi
 
  This project is mentored by Joel Barajas ( https://www.linkedin.com/in/joel-barajas-bb06b78/ ).
 
-To run SQL on jupyter notebook and enable "import sqlite3", simply do "conda install sqlite"
-
