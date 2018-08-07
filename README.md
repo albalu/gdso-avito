@@ -8,5 +8,9 @@ that we do during the data science workshop held by graduate data science organi
  teams of 4 mentored by data scientists from industry to work on some practical
  problems while learning to use their data science skills, network and have fun!
 
+To explore this project, please click on the icon below:
+
+[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/albalu/gdso-avito/master?filepath=index.ipynb)
+
  This project is mentored by Joel Barajas ( https://www.linkedin.com/in/joel-barajas-bb06b78/ ).
 
